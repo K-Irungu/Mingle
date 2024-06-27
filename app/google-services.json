@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "439106054753",
+    "project_id": "backend-7270b",
+    "storage_bucket": "backend-7270b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439106054753:android:b8af5bfe0d3738abac9820",
+        "android_client_info": {
+          "package_name": "com.example.easychat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-eCqZrSN_fHPPoag8wjaYBZFRrz11GaE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439106054753:android:3f66cd72d6ffa8c0ac9820",
+        "android_client_info": {
+          "package_name": "com.example.mingle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-eCqZrSN_fHPPoag8wjaYBZFRrz11GaE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
