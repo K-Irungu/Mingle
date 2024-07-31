@@ -6,7 +6,10 @@ import android.os.Handler;
 import android.annotation.SuppressLint;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -36,6 +39,9 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -58,7 +64,6 @@ public class ChatActivity extends AppCompatActivity {
     RecyclerView recyclerView;
     ImageView imageView;
 
-
     private final Handler handler = new Handler();
     int clickCount = 0;
     long startTime;
@@ -66,6 +71,8 @@ public class ChatActivity extends AppCompatActivity {
     static final int MAX_DURATION = 500; // Maximum duration between taps for it to be considered a double tap
     private static final long COUNTDOWN_INTERVAL = 100; // Adjusted for better timing
     protected static final int RESULT_SPEECH = 1;
+
+    TextToSpeech t1;
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -97,10 +104,18 @@ public class ChatActivity extends AppCompatActivity {
 
         sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
-            if (message.isEmpty()) return;
-            sendMessageToUser(message);
+            if (!message.isEmpty()) {
+                sendMessageToUser(message);
+            }
         });
 
+        t1 = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.ERROR) {
+                t1.setLanguage(Locale.ENGLISH);
+            }
+        });
+
+        // Event listener for double tap and long press
         recyclerView.setOnTouchListener(new View.OnTouchListener() {
             private boolean isMessageSent = false;
 
@@ -126,7 +141,7 @@ public class ChatActivity extends AppCompatActivity {
                                 duration = 0;
                             }
 
-                            //Logic for Activating Speech to Text
+                            // Logic for Activating Speech to Text
                             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
                             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
                             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
@@ -147,6 +162,7 @@ public class ChatActivity extends AppCompatActivity {
                 return true;
             }
 
+            // Logic for sending message on long press
             private final Runnable countdownRunnable = new Runnable() {
                 @Override
                 public void run() {
@@ -176,18 +192,50 @@ public class ChatActivity extends AppCompatActivity {
         getOrCreateChatroomModel();
         setupChatRecyclerView();
     }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        switch (requestCode){
-            case RESULT_SPEECH:
-                if(resultCode == RESULT_OK && data != null){
-                    ArrayList<String> text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                    assert text != null;
-                    messageInput.setText(text.get(0));
+        if (requestCode == RESULT_SPEECH && resultCode == RESULT_OK && data != null) {
+            ArrayList<String> text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (text != null && !text.isEmpty()) {
+                String recognizedText = text.get(0);
+
+                if (recognizedText.equalsIgnoreCase("Read me the last five messages in this conversation")) {
+                    readLastFiveMessages();
+                } else {
+                    String message = recognizedText;
+                    String recipient = otherUsername.getText().toString();
+                    String part1 = "Sending the following message to " + recipient;
+                    speakWithPause(part1, message);
+                    messageInput.setText(message);
                 }
-                break;
+            }
         }
+    }
+
+    private void speakWithPause(String part1, String part2) {
+        t1.speak(part1, TextToSpeech.QUEUE_FLUSH, null, null);
+        handler.postDelayed(() -> t1.speak(part2, TextToSpeech.QUEUE_ADD, null, null), 2000); // 2-second pause
+    }
+
+    private void readLastFiveMessages() {
+        FirebaseUtil.getChatroomMessageReference(chatroomId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(5)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        List<ChatMessageModel> messages = task.getResult().toObjects(ChatMessageModel.class);
+                        StringBuilder messagesToRead = new StringBuilder();
+                        for (int i = messages.size() - 1; i >= 0; i--) {
+                            ChatMessageModel message = messages.get(i);
+                            String senderName = message.getSenderId().equals(FirebaseUtil.currentUserId()) ? "You" : otherUser.getUsername();
+                            messagesToRead.append(senderName).append(" said ").append(message.getMessage()).append(". ");
+                        }
+                        t1.speak("Reading the last five messages in this conversation." + messagesToRead.toString(), TextToSpeech.QUEUE_FLUSH, null, null);
+                    }
+                });
     }
 
     @Override
@@ -226,13 +274,20 @@ public class ChatActivity extends AppCompatActivity {
 
         ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now());
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
-                .addOnCompleteListener(new OnCompleteListener<DocumentReference>() {
-                    @Override
-                    public void onComplete(@NonNull Task<DocumentReference> task) {
-                        if (task.isSuccessful()) {
-                            messageInput.setText("");
-                            sendNotification(message);
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        messageInput.setText("");
+                        sendNotification(message);
+
+                        // Read out "Message sent" using TTS
+                        t1.speak("Message sent", TextToSpeech.QUEUE_FLUSH, null, null);
+
+                        // Vibrate the phone
+                        Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                        if (vibrator != null && vibrator.hasVibrator()) {
+                            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE)); // 500 ms vibration
                         }
+
                     }
                 });
     }
