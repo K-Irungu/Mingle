@@ -26,7 +26,9 @@ import com.example.mingle.utils.FirebaseUtil;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.storage.UploadTask;
 
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
@@ -61,7 +63,7 @@ public class ProfileFragment extends Fragment {
                         }
                     }
                 }
-                );
+        );
     }
 
     @Override
@@ -155,16 +157,17 @@ public class ProfileFragment extends Fragment {
         setInProgress(true);
 
         FirebaseUtil.getCurrentProfilePicStorageRef().getDownloadUrl()
-                        .addOnCompleteListener(task -> {
-                                if(task.isSuccessful()){
-                                    Uri uri  = task.getResult();
-                                    AndroidUtil.setProfilePic(getContext(),uri,profilePic);
-                                }
-                        });
+                .addOnCompleteListener(task -> {
+                    if(task.isSuccessful()){
+                        Uri uri  = task.getResult();
+                        AndroidUtil.setProfilePic(getContext(),uri,profilePic);
+                    }
+                });
 
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
             setInProgress(false);
             currentUserModel = task.getResult().toObject(UserModel.class);
+            assert currentUserModel != null;
             usernameInput.setText(currentUserModel.getUsername());
             phoneInput.setText(currentUserModel.getPhone());
         });
@@ -181,7 +184,6 @@ public class ProfileFragment extends Fragment {
         }
     }
 }
-
 
 
 
